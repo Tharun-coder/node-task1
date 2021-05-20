@@ -1,6 +1,7 @@
 const express = require("express");
 const mongodb = require("mongodb");
 require("dotenv").config();
+// const router = require("./userAuth");
 
 const app = express();
 app.use(express.json());
@@ -8,6 +9,10 @@ app.use(express.json());
 const dbUrl = process.env.DB_URL;
 const mongoClient = mongodb.MongoClient;
 const objectId = mongodb.ObjectID;
+const cors = require("cors");
+app.use(cors());
+
+// app.use("/", router);
 
 let port = process.env.PORT || 3000;
 
@@ -174,24 +179,33 @@ app.delete("/mentors-delete/:id", async (req, res) => {
   }
 });
 
+//Assigning mentor to a student
+
 app.put("/mentor-students/:m_id/:s_id", async (req, res) => {
   try {
     let client = await mongoClient.connect(dbUrl);
     let db = client.db("node-task");
 
-    // await db
-    //   .collection("mentors")
-    //   .findOneAndUpdate(
-    //     { _id: objectId(req.params.m_id) },
-    //     { $set: { $push: { students: req.params.s_id } } }
-    //   );
+    let mentor = await db
+      .collection("mentors")
+      .findOne({ _id: objectId(req.params.m_id) });
+
     let student = await db
       .collection("students")
       .find({ _id: objectId(req.params.s_id) })
       .toArray();
 
-    console.log(student);
-    if (student[0].mentor === "") {
+    if (
+      !mentor.students.includes(req.params.s_id) &&
+      student[0].mentor === ""
+    ) {
+      await db
+        .collection("mentors")
+        .findOneAndUpdate(
+          { _id: objectId(req.params.m_id) },
+          { $push: { students: req.params.s_id } }
+        );
+
       await db
         .collection("students")
         .findOneAndUpdate(
@@ -202,13 +216,41 @@ app.put("/mentor-students/:m_id/:s_id", async (req, res) => {
         message: "Mapping updated successfully",
       });
     } else {
-      res.status(201).json({
+      res.status(100).json({
         message: "Cannont assign more than one mentor to a student",
       });
     }
   } catch (err) {
     console.log(err);
     res.status(400).status("Sorry, Mapping cannot be done");
+  }
+});
+
+//Listing all the students under a specific mentor
+
+app.get("/studentsofmentor/:m_id", async (req, res) => {
+  try {
+    let client = await mongoClient.connect(dbUrl);
+    let db = client.db("node-task");
+    let data = await db
+      .collection("mentors")
+      .findOne({ _id: objectId(req.params.m_id) });
+
+    let stu = await db.collection("students").find().toArray();
+
+    let stu_names = [];
+    data.students.forEach((e) => {
+      stu_names.push(stu.find((s) => objectId(s._id) == e).name);
+    });
+    res.status(200).json({
+      message: "Studends under the mentor are,",
+      data: stu_names.join(","),
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "No Data Found",
+    });
   }
 });
 
