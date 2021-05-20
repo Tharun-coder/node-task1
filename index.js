@@ -16,7 +16,7 @@ app.get("/students", async (req, res) => {
     let client = await mongoClient.connect(dbUrl);
     let db = client.db("node-task");
     let data = await db.collection("students").find().toArray();
-    // console.log(data);
+    console.log(data);
     res.status(200).json({
       message: "Students data is here",
       data,
